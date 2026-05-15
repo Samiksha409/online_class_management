@@ -1,174 +1,104 @@
 import { useState, useEffect } from "react";
-import Sidebar from "../components/Sidebar";
+import PageHeader from "../components/PageHeader";
 import { membersAPI } from "../services/api";
 
+function normalizeList(res) {
+  const d = res?.data;
+  if (Array.isArray(d)) return d;
+  if (Array.isArray(d?.results)) return d.results;
+  return [];
+}
+
+function fullName(user) {
+  if (!user) return "—";
+  const n = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+  return n || user.username || "—";
+}
+
 function Members() {
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone_number: "",
-  });
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetchMembers();
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const res = await membersAPI.getAll();
+        setRows(normalizeList(res));
+      } catch (e) {
+        setError("Could not load students. Ensure you are signed in and the API is running.");
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  const fetchMembers = async () => {
-    setLoading(true);
-    try {
-      const response = await membersAPI.getAll();
-      setMembers(response.data);
-    } catch (error) {
-      console.error("Error fetching members:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (editingId) {
-        await membersAPI.update(editingId, formData);
-      } else {
-        await membersAPI.create(formData);
-      }
-      setFormData({ name: "", email: "", phone_number: "" });
-      setShowForm(false);
-      setEditingId(null);
-      fetchMembers();
-    } catch (error) {
-      console.error("Error saving member:", error);
-    }
-  };
-
-  const handleEdit = (member) => {
-    setFormData(member);
-    setEditingId(member.id);
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure?")) {
-      try {
-        await membersAPI.delete(id);
-        fetchMembers();
-      } catch (error) {
-        console.error("Error deleting member:", error);
-      }
-    }
-  };
-
   return (
-    <div className="flex">
-      <Sidebar />
-      <div className="ml-64 p-8 w-full">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Members</h1>
-          <button
-            onClick={() => {
-              setShowForm(!showForm);
-              if (showForm) {
-                setFormData({ name: "", email: "", phone_number: "" });
-                setEditingId(null);
-              }
-            }}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-          >
-            {showForm ? "Cancel" : "Add Member"}
-          </button>
-        </div>
+    <div className="flex min-h-screen min-w-0 flex-1 flex-col bg-slate-100">
+      <PageHeader
+        eyebrow="Directory"
+        title="Students"
+        subtitle="Official roster from the database — linked to user accounts, roll numbers, and program details."
+      />
 
-        {showForm && (
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow mb-8">
-            <div className="grid grid-cols-3 gap-4">
-              <input
-                type="text"
-                name="name"
-                placeholder="Name"
-                value={formData.name}
-                onChange={handleChange}
-                className="border p-2 rounded"
-                required
-              />
-              <input
-                type="email"
-                name="email"
-                placeholder="Email"
-                value={formData.email}
-                onChange={handleChange}
-                className="border p-2 rounded"
-                required
-              />
-              <input
-                type="tel"
-                name="phone_number"
-                placeholder="Phone"
-                value={formData.phone_number}
-                onChange={handleChange}
-                className="border p-2 rounded"
-              />
-            </div>
-            <button
-              type="submit"
-              className="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-            >
-              {editingId ? "Update" : "Save"}
-            </button>
-          </form>
-        )}
-
-        {loading ? (
-          <div>Loading...</div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-4 text-left">Name</th>
-                  <th className="p-4 text-left">Email</th>
-                  <th className="p-4 text-left">Phone</th>
-                  <th className="p-4 text-left">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((member) => (
-                  <tr key={member.id} className="border-t hover:bg-gray-50">
-                    <td className="p-4">{member.name}</td>
-                    <td className="p-4">{member.email}</td>
-                    <td className="p-4">{member.phone_number}</td>
-                    <td className="p-4">
-                      <button
-                        onClick={() => handleEdit(member)}
-                        className="bg-blue-500 text-white px-3 py-1 rounded mr-2"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(member.id)}
-                        className="bg-red-500 text-white px-3 py-1 rounded"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
+        {error && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {error}
           </div>
         )}
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-6 py-4">
+            <p className="text-sm text-slate-500">
+              <span className="font-semibold text-slate-800">{rows.length}</span>{" "}
+              student{rows.length === 1 ? "" : "s"} in directory
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="p-12 text-center text-sm text-slate-500">Loading roster…</div>
+          ) : rows.length === 0 ? (
+            <div className="p-12 text-center text-sm text-slate-500">
+              No students yet. Register student accounts or run{" "}
+              <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">seed_data</code>.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/80 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-6 py-3">Roll no.</th>
+                    <th className="px-6 py-3">Name</th>
+                    <th className="px-6 py-3">Username</th>
+                    <th className="px-6 py-3">Email</th>
+                    <th className="px-6 py-3">Program</th>
+                    <th className="px-6 py-3">Semester</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {rows.map((s) => (
+                    <tr key={s.id} className="hover:bg-slate-50/80">
+                      <td className="whitespace-nowrap px-6 py-4 font-mono text-xs font-medium text-slate-800">
+                        {s.roll_number}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-slate-900">
+                        {fullName(s.user)}
+                      </td>
+                      <td className="px-6 py-4 text-slate-600">{s.user?.username ?? "—"}</td>
+                      <td className="px-6 py-4 text-slate-600">{s.user?.email ?? "—"}</td>
+                      <td className="px-6 py-4 text-slate-600">{s.program}</td>
+                      <td className="px-6 py-4 text-slate-600">{s.semester}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

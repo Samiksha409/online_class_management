@@ -1,29 +1,34 @@
 import { useState, useEffect } from "react";
-import Sidebar from "../components/Sidebar";
-import { classesAPI, typesAPI } from "../services/api";
+import PageHeader from "../components/PageHeader";
+import { classesAPI, coursesAPI } from "../services/api";
+
+const emptyForm = {
+  title: "",
+  course: "",
+  scheduled_date: "",
+  start_time: "",
+  end_time: "",
+  room: "",
+};
 
 function Classes() {
   const [classes, setClasses] = useState([]);
-  const [types, setTypes] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
-    class_name: "",
-    type: "",
-    duration_mins: "",
-  });
+  const [formData, setFormData] = useState(emptyForm);
 
   useEffect(() => {
     fetchClasses();
-    fetchTypes();
+    fetchCourses();
   }, []);
 
   const fetchClasses = async () => {
     setLoading(true);
     try {
       const response = await classesAPI.getAll();
-      setClasses(response.data);
+      setClasses(response.data?.results || response.data || []);
     } catch (error) {
       console.error("Error fetching classes:", error);
     } finally {
@@ -31,37 +36,30 @@ function Classes() {
     }
   };
 
-  const fetchTypes = async () => {
+  const fetchCourses = async () => {
     try {
-      const response = await typesAPI.getAll();
-      setTypes(response.data);
+      const response = await coursesAPI.getAll();
+      setCourses(response.data?.results || response.data || []);
     } catch (error) {
-      console.error("Error fetching types:", error);
+      console.error("Error fetching courses:", error);
     }
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const data = {
-        ...formData,
-        type: parseInt(formData.type),
-        duration_mins: parseInt(formData.duration_mins),
-      };
+      const data = { ...formData, course: Number(formData.course) };
       if (editingId) {
         await classesAPI.update(editingId, data);
       } else {
         await classesAPI.create(data);
       }
-      setFormData({ class_name: "", type: "", duration_mins: "" });
+      setFormData(emptyForm);
       setShowForm(false);
       setEditingId(null);
       fetchClasses();
@@ -71,131 +69,188 @@ function Classes() {
   };
 
   const handleEdit = (cls) => {
-    setFormData(cls);
+    setFormData({
+      title: cls.title || "",
+      course: cls.course || "",
+      scheduled_date: cls.scheduled_date || "",
+      start_time: cls.start_time || "",
+      end_time: cls.end_time || "",
+      room: cls.room || "",
+    });
     setEditingId(cls.id);
     setShowForm(true);
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure?")) {
-      try {
-        await classesAPI.delete(id);
-        fetchClasses();
-      } catch (error) {
-        console.error("Error deleting class:", error);
-      }
+    if (!window.confirm("Delete this class session?")) return;
+    try {
+      await classesAPI.delete(id);
+      fetchClasses();
+    } catch (error) {
+      console.error("Error deleting class:", error);
     }
   };
 
-  const getTypeName = (typeId) => {
-    const type = types.find((t) => t.id === typeId);
-    return type ? type.type_name : "N/A";
+  const getCourseName = (courseId) => {
+    const course = courses.find((c) => c.id === courseId);
+    return course ? `${course.code} · ${course.name}` : "—";
   };
 
   return (
-    <div className="flex">
-      <Sidebar />
-      <div className="ml-64 p-8 w-full">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Classes</h1>
+    <div className="flex min-h-screen min-w-0 flex-1 flex-col bg-slate-100">
+      <PageHeader
+        eyebrow="Operations"
+        title="Class sessions"
+        subtitle="Schedule teaching blocks: link each session to a course, set date, time window, and optional room."
+        actions={
           <button
+            type="button"
             onClick={() => {
               setShowForm(!showForm);
               if (showForm) {
-                setFormData({ class_name: "", type: "", duration_mins: "" });
+                setFormData(emptyForm);
                 setEditingId(null);
               }
             }}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500"
           >
-            {showForm ? "Cancel" : "Add Class"}
+            {showForm ? "Close form" : "Add session"}
           </button>
-        </div>
+        }
+      />
 
+      <div className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
         {showForm && (
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow mb-8">
-            <div className="grid grid-cols-3 gap-4">
+          <form
+            onSubmit={handleSubmit}
+            className="mb-8 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm"
+          >
+            <p className="mb-4 text-sm font-medium text-slate-700">
+              {editingId ? "Edit session" : "New session"}
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <input
                 type="text"
-                name="class_name"
-                placeholder="Class Name"
-                value={formData.class_name}
+                name="title"
+                placeholder="Session title *"
+                value={formData.title}
                 onChange={handleChange}
-                className="border p-2 rounded"
+                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none ring-indigo-500/0 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500/20"
                 required
               />
               <select
-                name="type"
-                value={formData.type}
+                name="course"
+                value={formData.course}
                 onChange={handleChange}
-                className="border p-2 rounded"
+                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500/20"
                 required
               >
-                <option value="">Select Type</option>
-                {types.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.type_name}
+                <option value="">Select course *</option>
+                {courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.code} — {course.name}
                   </option>
                 ))}
               </select>
               <input
-                type="number"
-                name="duration_mins"
-                placeholder="Duration (mins)"
-                value={formData.duration_mins}
+                type="date"
+                name="scheduled_date"
+                value={formData.scheduled_date}
                 onChange={handleChange}
-                className="border p-2 rounded"
+                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500/20"
                 required
+              />
+              <input
+                type="time"
+                name="start_time"
+                value={formData.start_time}
+                onChange={handleChange}
+                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500/20"
+                required
+              />
+              <input
+                type="time"
+                name="end_time"
+                value={formData.end_time}
+                onChange={handleChange}
+                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500/20"
+                required
+              />
+              <input
+                type="text"
+                name="room"
+                placeholder="Room / link (optional)"
+                value={formData.room}
+                onChange={handleChange}
+                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
             <button
               type="submit"
-              className="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+              className="mt-5 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
-              {editingId ? "Update" : "Save"}
+              {editingId ? "Save changes" : "Create session"}
             </button>
           </form>
         )}
 
-        {loading ? (
-          <div>Loading...</div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-4 text-left">Class Name</th>
-                  <th className="p-4 text-left">Type</th>
-                  <th className="p-4 text-left">Duration (mins)</th>
-                  <th className="p-4 text-left">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {classes.map((cls) => (
-                  <tr key={cls.id} className="border-t hover:bg-gray-50">
-                    <td className="p-4">{cls.class_name}</td>
-                    <td className="p-4">{getTypeName(cls.type)}</td>
-                    <td className="p-4">{cls.duration_mins}</td>
-                    <td className="p-4">
-                      <button
-                        onClick={() => handleEdit(cls)}
-                        className="bg-blue-500 text-white px-3 py-1 rounded mr-2"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(cls.id)}
-                        className="bg-red-500 text-white px-3 py-1 rounded"
-                      >
-                        Delete
-                      </button>
-                    </td>
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          {loading ? (
+            <div className="p-12 text-center text-sm text-slate-500">Loading sessions…</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/80 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-6 py-3">Session</th>
+                    <th className="px-6 py-3">Course</th>
+                    <th className="px-6 py-3">Date</th>
+                    <th className="px-6 py-3">Time</th>
+                    <th className="px-6 py-3 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {classes.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                        No sessions yet. Create a course first, then add a session.
+                      </td>
+                    </tr>
+                  ) : (
+                    classes.map((cls) => (
+                      <tr key={cls.id} className="hover:bg-slate-50/80">
+                        <td className="px-6 py-4 font-medium text-slate-900">{cls.title}</td>
+                        <td className="px-6 py-4 text-slate-600">{getCourseName(cls.course)}</td>
+                        <td className="whitespace-nowrap px-6 py-4 text-slate-600">
+                          {cls.scheduled_date}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-slate-600">
+                          {cls.start_time} – {cls.end_time}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(cls)}
+                            className="mr-2 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(cls.id)}
+                            className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

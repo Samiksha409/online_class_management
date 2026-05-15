@@ -1,20 +1,20 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Classes from "./pages/Classes";
-import Members from "./pages/Members";
+import Login from "./pages/login";
+import Register from "./pages/register";
+import Dashboard from "./pages/dashboard";
+import Classes from "./pages/classes";
+import Members from "./pages/members";
 import Instructors from "./pages/Instructors";
-import Schedule from "./pages/Schedule";
+import Schedule from "./pages/schedule";
 import Types from "./pages/Types";
+import MainLayout from "./components/MainLayout";
 
 function App() {
   const [isAuth, setIsAuth] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Sync auth with localStorage
   useEffect(() => {
     const checkAuth = () => {
       const token = localStorage.getItem("access_token");
@@ -24,13 +24,25 @@ function App() {
 
     checkAuth();
 
-    // Optional: listen for storage changes (multi-tab support)
     window.addEventListener("storage", checkAuth);
-    return () => window.removeEventListener("storage", checkAuth);
+    // Same-tab login/logout does not fire "storage"; use a tiny app event instead.
+    window.addEventListener("ocms:auth", checkAuth);
+    return () => {
+      window.removeEventListener("storage", checkAuth);
+      window.removeEventListener("ocms:auth", checkAuth);
+    };
   }, []);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
+        <div className="text-center">
+          <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+          <p className="text-sm font-medium text-slate-300">ClassHub</p>
+          <p className="text-xs text-slate-500">Loading…</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -56,42 +68,78 @@ function App() {
         <Route
           path="/dashboard"
           element={
-            isAuth ? <Dashboard /> : <Navigate to="/" replace />
+            isAuth ? (
+              <MainLayout>
+                <Dashboard />
+              </MainLayout>
+            ) : (
+              <Navigate to="/" replace />
+            )
           }
         />
 
         <Route
           path="/classes"
           element={
-            isAuth ? <Classes /> : <Navigate to="/" replace />
+            isAuth ? (
+              <MainLayout>
+                <Classes />
+              </MainLayout>
+            ) : (
+              <Navigate to="/" replace />
+            )
           }
         />
 
         <Route
           path="/members"
           element={
-            isAuth ? <Members /> : <Navigate to="/" replace />
+            isAuth ? (
+              <MainLayout>
+                <Members />
+              </MainLayout>
+            ) : (
+              <Navigate to="/" replace />
+            )
           }
         />
 
         <Route
           path="/instructors"
           element={
-            isAuth ? <Instructors /> : <Navigate to="/" replace />
+            isAuth ? (
+              <MainLayout>
+                <Instructors />
+              </MainLayout>
+            ) : (
+              <Navigate to="/" replace />
+            )
           }
         />
 
         <Route
           path="/schedule"
           element={
-            isAuth ? <Schedule /> : <Navigate to="/" replace />
+            isAuth ? (
+              <MainLayout>
+                <Schedule />
+              </MainLayout>
+            ) : (
+              <Navigate to="/" replace />
+            )
           }
         />
 
         <Route
           path="/types"
           element={
-            isAuth ? <Types /> : <Navigate to="/" replace />
+            isAuth ? (
+              <MainLayout>
+                <Types />
+              </MainLayout>
+            ) : (
+              <Navigate to="/" replace />
+            )
           }
         />
 

@@ -1,9 +1,12 @@
 import axios from "axios";
 
-// ================= BASE URL =================
-const BASE_URL = "http://localhost:8000/api";
+// Match Django host: use same host you open in browser (localhost vs 127.0.0.1) to avoid CORS surprises.
+const BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(
+    /\/$/,
+    ""
+  );
 
-// ================= AXIOS INSTANCE =================
 const api = axios.create({
   baseURL: BASE_URL,
   headers: {
@@ -11,7 +14,6 @@ const api = axios.create({
   },
 });
 
-// ================= REQUEST INTERCEPTOR =================
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("access_token");
@@ -23,7 +25,6 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ================= RESPONSE INTERCEPTOR =================
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -34,9 +35,7 @@ api.interceptors.response.use(
 
       try {
         const refresh = localStorage.getItem("refresh_token");
-
-        // ✅ FIXED refresh URL
-        const res = await axios.post(`${BASE_URL}/token/refresh/`, {
+        const res = await axios.post(`${BASE_URL}/auth/token/refresh/`, {
           refresh,
         });
 
@@ -57,19 +56,42 @@ api.interceptors.response.use(
   }
 );
 
-// ================= AUTH API =================
 export const authAPI = {
-  // ✅ FIXED LOGIN
-  login: (data) => axios.post(`${BASE_URL}/token/`, data),
+  login: (data) => axios.post(`${BASE_URL}/auth/token/`, data),
+  register: (data) => axios.post(`${BASE_URL}/auth/register/`, data),
+  profile: () => api.get("/auth/profile/"),
 };
 
-// ================= GENERIC SAFE GET =================
-const safeGet = (url) => api.get(url);
+const crudFactory = (path) => ({
+  getAll: (params = {}) => api.get(path, { params }),
+  getOne: (id) => api.get(`${path}${id}/`),
+  create: (payload) => api.post(path, payload),
+  update: (id, payload) => api.put(`${path}${id}/`, payload),
+  delete: (id) => api.delete(`${path}${id}/`),
+});
 
-// ================= APIs =================
-export const membersAPI = { getAll: () => safeGet("/members/") };
-export const classesAPI = { getAll: () => safeGet("/classes/") };
-export const instructorsAPI = { getAll: () => safeGet("/instructors/") };
-export const schedulesAPI = { getAll: () => safeGet("/schedules/") };
+export const dashboardAPI = {
+  summary: () => api.get("/dashboard/summary/"),
+};
+
+export const coursesAPI = crudFactory("/courses/");
+export const classesAPI = crudFactory("/class-sessions/");
+export const assignmentsAPI = crudFactory("/assignments/");
+export const submissionsAPI = crudFactory("/submissions/");
+export const attendanceAPI = crudFactory("/attendance/");
+export const studyMaterialsAPI = crudFactory("/study-materials/");
+export const noticesAPI = crudFactory("/notices/");
+export const membersAPI = {
+  getAll: () => api.get("/auth/students/"),
+};
+export const instructorsAPI = {
+  getAll: () => api.get("/auth/teachers/"),
+};
+export const schedulesAPI = {
+  getAll: () => api.get("/class-sessions/"),
+};
+export const typesAPI = {
+  ...crudFactory("/courses/"),
+};
 
 export default api;
